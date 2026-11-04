@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>切图重组 v5 · 折行重组工作台</title>
+<style>
+  :root{
+    --bg:#eef0f3; --card:#fff; --line:#e4e7ec; --text:#1d2129; --muted:#6b7280;
+    --accent:#2f6fed; --accent-soft:#eaf1ff; --ok:#12a35a; --warn:#c2410c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  .topbar{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:18px 28px 6px}
+  .topbar h1{font-size:20px;margin:0}
+  .topbar .ver{font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:2px 9px;vertical-align:2px}
+  .topbar p{margin:0;font-size:13px;color:var(--muted)}
+  .layout{display:grid;grid-template-columns:330px minmax(0,1fr);gap:18px;padding:14px 28px 28px;align-items:start}
+  @media (max-width:1080px){.layout{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px -18px rgba(16,24,40,.25);overflow:hidden}
+  .card-hd{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--line);font-size:13px;font-weight:600}
+  .card-hd .badge{margin-left:auto;font-weight:500;font-size:12px;color:var(--muted);background:#f5f6f8;border-radius:999px;padding:2px 9px;font-variant-numeric:tabular-nums}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none}
+  .dot.out{background:var(--ok)}
+  .previews{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+  @media (max-width:860px){.previews{grid-template-columns:1fr}}
+  .stage{padding:16px;display:flex;justify-content:center;align-items:flex-start;min-height:220px;max-height:calc(100vh - 200px);overflow:auto;
+    background:linear-gradient(45deg,#f7f8fa 25%,transparent 25%,transparent 75%,#f7f8fa 75%) 0 0/16px 16px,
+               linear-gradient(45deg,#f7f8fa 25%,#fff 25%,#fff 75%,#f7f8fa 75%) 8px 8px/16px 16px}
+  .stage canvas{background:#fff;box-shadow:0 1px 6px rgba(16,24,40,.12);margin:0 auto}
+  .controls .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:13px}
+  .drop{border:1.5px dashed #c9ced6;border-radius:10px;padding:16px 12px;text-align:center;color:var(--muted);font-size:13px;cursor:pointer}
+  .drop:hover,.drop.hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .title{font-size:11px;font-weight:700;letter-spacing:.08em;color:#98a1ae;text-transform:uppercase}
+  .row{display:flex;align-items:center;gap:10px;font-size:13px}
+  .row>span:first-child{flex:none;width:80px;color:#374151}
+  .row input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
+  .row input[type=number]{width:66px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:13px}
+  .row input[type=number]:disabled{background:#f2f4f7;color:#9aa3af;cursor:not-allowed}
+  .num{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600;min-width:60px;text-align:right}
+  .switch-row{display:flex;flex-direction:column;gap:6px}
+  .switch{position:relative;display:inline-flex;align-items:center;gap:10px;font-size:13px;color:#374151;cursor:pointer;user-select:none}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch .track{width:40px;height:22px;border-radius:999px;background:#d6dbe2;transition:.16s;flex:none;position:relative}
+  .switch .track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.28);transition:.16s}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::after{transform:translateX(18px)}
+  .mini{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#4b5563;border:1px solid var(--line);padding:4px 8px;border-radius:7px;cursor:pointer;user-select:none;white-space:nowrap}
+  .mini input{accent-color:var(--accent);margin:0}
+  .mini:has(input:checked){border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .seg{display:flex;gap:6px}
+  .seg button{flex:1;padding:7px 0;font-size:13px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:#fff;color:#4b5563}
+  .seg button:hover{border-color:var(--accent);color:var(--accent)}
+  .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn{flex:1;border:0;border-radius:9px;padding:10px 12px;font-size:14px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600}
+  .btn:hover{filter:brightness(1.06)}
+  .hint{font-size:12px;line-height:1.6;color:var(--muted)}
+  .hint b{color:var(--accent);font-weight:600}
+  .status{font-size:12px;line-height:1.6;border-radius:8px;padding:8px 10px;background:#f6f8fa;color:#374151}
+  .status.ok{background:#eaf7ef;color:#0f7a44}
+  .status.bad{background:#fdecec;color:#b42318}
+  .divider{height:1px;background:var(--line)}
+  .foot{font-size:12px;color:var(--muted);padding:0 4px}
+
+  /* ================= v5 主题 ================= */
+  :root{
+    --bg:#f3f5f9; --card:#ffffff; --line:#e6e9f0; --text:#111827; --muted:#6b7280;
+    --accent:#4f6ef7; --accent2:#8b5cf6; --accent-soft:#eef2ff;
+    --ok:#10b981; --bad:#ef4444;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 14px 36px -22px rgba(16,24,40,.4);
+  }
+  body{
+    background:
+      radial-gradient(1100px 520px at 4% -12%, #e6ecff 0%, rgba(230,236,255,0) 62%),
+      radial-gradient(900px 460px at 102% -6%, #f4e9ff 0%, rgba(244,233,255,0) 58%),
+      var(--bg);
+    min-height:100vh;
+  }
+  .topbar{align-items:center;padding:22px 30px 10px;gap:14px}
+  .topbar h1{font-size:22px;letter-spacing:.2px;font-weight:750}
+  .topbar h1 .logo{
+    display:inline-flex;width:26px;height:26px;border-radius:8px;vertical-align:-5px;margin-right:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 6px 14px -6px rgba(79,110,247,.8);position:relative;
+  }
+  .topbar h1 .logo::after{
+    content:"";position:absolute;inset:6px;border:1.6px solid rgba(255,255,255,.9);border-radius:3px;
+  }
+  .topbar .ver{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;padding:3px 10px;box-shadow:0 4px 12px -6px rgba(79,110,247,.8)}
+  .topbar p{font-size:13px;color:var(--muted)}
+  .guide-btn{
+    margin-left:auto;border:1px solid var(--line);background:#fff;color:#374151;border-radius:10px;
+    padding:8px 14px;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.04);transition:.15s;
+  }
+  .guide-btn:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+  .layout{gap:20px;padding:10px 30px 46px}
+  .card{border-radius:var(--radius);box-shadow:var(--shadow);border-color:var(--line)}
+  .card-hd{padding:12px 16px;background:linear-gradient(#fff,#fbfcfe);font-weight:650}
+  .card-hd .badge{background:#f3f5f9}
+  .stage{
+    background:
+      linear-gradient(45deg,#f5f7fb 25%,transparent 25%,transparent 75%,#f5f7fb 75%) 0 0/18px 18px,
+      linear-gradient(45deg,#f5f7fb 25%,#fff 25%,#fff 75%,#f5f7fb 75%) 9px 9px/18px 18px;
+    border-top:1px solid #f1f3f8;
+  }
+  .stage canvas{border-radius:6px;box-shadow:0 2px 14px -4px rgba(16,24,40,.22)}
+  .controls .body{gap:14px;padding:16px}
+  .drop{
+    border:1.5px dashed #c7cddb;border-radius:12px;padding:18px 12px;background:#fbfcff;
+    transition:.16s;
+  }
+  .drop:hover,.drop.hover{background:var(--accent-soft);border-color:var(--accent);transform:translateY(-1px)}
+  .title{font-size:11px;letter-spacing:.12em;color:#98a1b3}
+  .row>span:first-child{color:#475569;font-weight:550}
+  .row input[type=number]{
+    border-radius:9px;border-color:#dfe3ec;background:#fff;transition:.14s;
+  }
+  .row input[type=number]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,110,247,.14)}
+  .row input[type=range]{height:18px}
+  .num{color:var(--accent);font-weight:700}
+  .seg button{border-radius:10px;font-weight:550;transition:.14s}
+  .seg button:hover{background:var(--accent-soft);transform:translateY(-1px)}
+  .seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;box-shadow:0 8px 16px -10px rgba(79,110,247,.9)}
+  .btn{
+    background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:11px;
+    box-shadow:0 10px 20px -12px rgba(79,110,247,.9);transition:.15s;
+  }
+  .btn:hover{transform:translateY(-1px);filter:brightness(1.04)}
+  .ghost{border-radius:9px;font-weight:550}
+  .status{border-radius:10px;border:1px solid #edf0f6}
+  .status.ok{border-color:#d8f3e4}
+  .status.bad{border-color:#fbdada}
+  .switch .track{background:#dde2ec}
+  .switch input:checked + .track{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  .mini:has(input:checked){background:var(--accent-soft)}
+  .divider{background:#eef1f7}
+  /* 页脚署名 */
+  .signature{
+    position:fixed;right:18px;bottom:12px;z-index:5;
+    font-size:11.5px;color:#a2abba;letter-spacing:.02em;
+    background:rgba(255,255,255,.72);backdrop-filter:blur(6px);
+    padding:4px 10px;border-radius:999px;border:1px solid rgba(226,230,238,.9);
+  }
+  /* 使用指南弹窗 */
+  .mask{
+    position:fixed;inset:0;background:rgba(17,24,39,.42);backdrop-filter:blur(2px);
+    display:flex;align-items:center;justify-content:center;padding:24px;z-index:20;
+  }
+  .mask[hidden]{display:none}
+  .modal{
+    background:#fff;border-radius:18px;max-width:760px;width:100%;max-height:82vh;display:flex;flex-direction:column;
+    box-shadow:0 30px 80px -30px rgba(16,24,40,.6);overflow:hidden;
+  }
+  .modal-hd{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);font-size:15px}
+  .modal-hd b{font-size:15px}
+  .modal-x{margin-left:auto;border:0;background:#f3f5f9;color:#64748b;width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:14px}
+  .modal-x:hover{background:#e8ecf5;color:#111827}
+  .modal-bd{padding:6px 22px 22px;overflow:auto;font-size:13px;line-height:1.75;color:#374151}
+  .modal-bd h3{font-size:13px;margin:18px 0 6px;color:#111827}
+  .modal-bd h3:first-child{margin-top:14px}
+  .modal-bd ol,.modal-bd ul{margin:6px 0 0;padding-left:20px}
+  .modal-bd li{margin:3px 0}
+  .modal-bd code{background:#f3f5f9;border-radius:5px;padding:1px 6px;font-size:12px;color:#4f6ef7}
+  .modal-bd .tip{background:#f7f9ff;border:1px solid #e5ebff;border-radius:10px;padding:10px 12px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><span class="logo"></span>切图重组 <span class="ver">v5</span></h1>
+  <p>规整抽样 · 折行重组 · 色块马赛克 · 逐块可追溯</p>
+  <button class="guide-btn" id="guideBtn">📖 使用指南</button>
+</div>
+
+<div class="layout">
+  <aside class="card controls">
+    <div class="card-hd"><span class="dot"></span>参数<span class="badge" id="badgeGeo">—</span></div>
+    <div class="body">
+      <div class="drop" id="drop">点击选择 / 拖入图片</div>
+      <input type="file" id="file" accept="image/*" hidden>
+
+      <div class="title">切块</div>
+      <div class="row"><span>块大小</span>
+        <input type="range" id="tileSize" min="0" max="100" value="42" step="1">
+        <span class="num" id="tileVal">46×39</span>
+      </div>
+      <div class="hint" id="tileHint">块越小 → 网格越密</div>
+      <div class="row"><span>块宽 / 高</span>
+        <input type="number" id="tw" value="46" min="4">
+        <input type="number" id="th" value="39" min="4">
+        <label class="mini" title="锁定为正方形方块"><input type="checkbox" id="square"> 1:1</label>
+      </div>
+      <div class="row"><span>步长 X / Y</span>
+        <input type="number" id="sx" value="2" min="1">
+        <input type="number" id="sy" value="2" min="1">
+        <label class="mini" title="横纵步长锁定一致"><input type="checkbox" id="stride1to1"> 1:1</label>
+      </div>
+
+      <div class="divider"></div>
+      <div class="title">预览</div>
+      <div class="row"><span>原图缩放</span>
+        <input type="range" id="zoomS" min="10" max="400" value="100" step="1">
+        <span class="num" id="zoomSVal">100%</span>
+      </div>
+      <div class="row"><span>结果缩放</span>
+        <input type="range" id="zoomO" min="10" max="400" value="100" step="1">
+        <span class="num" id="zoomOVal">100%</span>
+      </div>
+      <button class="ghost" id="fitBtn" style="width:100%;padding:7px 10px">适应窗口</button>
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="fullHole">
+          <span class="track"></span>
+          <span class="lbl">整格留白</span>
+        </label>
+        <span class="hint" id="holeMode">关：左上角小白块 · 开：整格全白（与裁切一致）</span>
+      </div>
+
+      <div class="divider"></div>
+      <div class="title">重组</div>
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="peopleOn">
+          <span class="track"></span>
+          <span class="lbl">折行重组</span>
+        </label>
+        <span class="hint" id="peopleHint">关 = 完整缩略图；开 = 按下面人数折行</span>
+      </div>
+      <div class="seg" id="presets">
+        <button data-k="2">2 人</button>
+        <button data-k="3">3 人</button>
+        <button data-k="4">4 人</button>
+        <button data-k="8">8 人</button>
+      </div>
+      <div class="row"><span>每行块数</span>
+        <input type="number" id="pc" value="0" min="0" style="width:80px">
+        <span class="hint" style="margin-left:auto">0 = 自动</span>
+      </div>
+      <div class="row"><span>块间缝隙</span>
+        <input type="range" id="gap" min="0" max="12" value="4">
+        <span class="num" id="gapVal">4</span>
+      </div>
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="mosaicOn">
+          <span class="track"></span>
+          <span class="lbl">色块马赛克</span>
+        </label>
+        <span class="hint" id="mosaicHint">开：每块取主色填充，拼成色块新画</span>
+      </div>
+      <div class="row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="scramble"> 乱序重组（对照用）
+      </label></div>
+
+      <div class="divider"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="run">重新生成</button>
+        <button class="ghost" id="check" style="flex:none;padding:10px 14px">抽查校验</button>
+      </div>
+      <div class="status" id="verify">抽查校验：随机比对 24 块是否与原图裁切一致（不自动跑，避免卡顿）</div>
+      <div class="status" id="imageNotice" style="display:none"></div>
+      <div class="hint" id="pcHint"></div>
+    </div>
+  </aside>
+
+  <div class="previews">
+    <section class="card">
+      <div class="card-hd"><span class="dot"></span>原图<span class="badge" id="badgeSrc">—</span>
+        <button class="ghost" id="saveSrc">下载</button></div>
+      <div class="stage"><canvas id="cvOrig"></canvas></div>
+    </section>
+    <section class="card">
+      <div class="card-hd"><span class="dot out"></span>结果<span class="badge" id="badgeOut">—</span>
+        <button class="ghost" id="saveOut">下载</button></div>
+      <div class="stage"><canvas id="cvOut"></canvas></div>
+    </section>
+  </div>
+</div>
+<div class="foot" id="hoverInfo" style="padding:0 28px 18px">把鼠标移到「结果」里的任意一块上，会在左边「原图」里框出它的来源。</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let srcImage = null;
+const MARKER_RATIO = 0.4;
+const BASE_TW = 46, BASE_TH = 39;
+
+/* ---------- 状态 ---------- */
+let last = null;   // { pieces, cols, tw, th, pc, gap, pr, panel }
+let peopleOn = false;   // 折行重组开关
+let peopleK = 2;        // 目标人数（2/3/4/8）
+let lastPanel = null;
+
+/* ---------- 图片载入 ---------- */
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+$('file').onchange = e => loadFile(e.target.files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('hover'); };
+drop.ondragleave = () => drop.classList.remove('hover');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('hover'); loadFile(e.dataTransfer.files[0]); };
+
+function loadFile(f) {
+  if (!f || !f.type.startsWith('image/')) return;
+  const img = new Image();
+  img.onload = async () => {
+    try { await img.decode?.(); } catch (e) { /* 忽略 */ }
+    srcImage = ensureWorkable(img);
+    drop.textContent = f.name;
+    render();
+  };
+  img.src = URL.createObjectURL(f);
+}
+
+/* 超大图先缩到可处理的工作尺寸：避免浏览器画布内存超限导致绘制失败 */
+const MAX_SIDE = 4096;
+function ensureWorkable(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (Math.max(w, h) <= MAX_SIDE) { note(''); return img; }
+  const s = MAX_SIDE / Math.max(w, h);
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * s);
+  c.height = Math.round(h * s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  note(`原图 ${w}×${h} 过大，已按最长边 ${MAX_SIDE}px 生成工作副本（所有块都从这个副本裁切，前后一致）`);
+  return c;
+}
+function note(txt) {
+  const n = $('imageNotice');
+  if (!n) return;
+  n.textContent = txt;
+  n.style.display = txt ? '' : 'none';
+}
+
+/* ---------- 块大小滑杆：非线性刻度 ----------
+ * 0 ~ 36 档 → 4 ~ 40 px（1px 一档，最精细，和手填数字的下限一致）
+ * 36 ~ 100 档 → 40 ~ 200 px（几何递增，块越大跳得越多）
+ */
+const W_MIN = 4, W_FINE = 40, W_MAX = 200, P_FINE = 36;
+function sliderToWidth(p) {
+  p = Math.max(0, Math.min(100, p));
+  if (p <= P_FINE) return W_MIN + p;
+  const t = (p - P_FINE) / (100 - P_FINE);
+  return Math.round(W_FINE * Math.pow(W_MAX / W_FINE, t));
+}
+function widthToSlider(w) {
+  w = Math.max(W_MIN, Math.min(W_MAX, w));
+  if (w <= W_FINE) return Math.round(w - W_MIN);
+  const t = Math.log(w / W_FINE) / Math.log(W_MAX / W_FINE);
+  return Math.round(P_FINE + t * (100 - P_FINE));
+}
+
+/* ---------- 块大小滑杆：按当前宽高比等比缩放（1:1 锁定时宽高相等） ---------- */
+function applyTileSlider() {
+  const newTw = Math.max(4, sliderToWidth(+$('tileSize').value));
+  if ($('square').checked) {
+    $('tw').value = newTw;
+    $('th').value = newTw;
+  } else {
+    const curTw = Math.max(4, +$('tw').value || BASE_TW);
+    const curTh = Math.max(4, +$('th').value || BASE_TH);
+    const aspect = curTh / curTw;
+    $('tw').value = newTw;
+    $('th').value = Math.max(4, Math.round(newTw * aspect));
+  }
+  render();
+}
+function syncTileSlider(id) {
+  if ($('square').checked) {
+    if (id === 'tw') $('th').value = $('tw').value;
+    else if (id === 'th') $('tw').value = $('th').value;
+  }
+  $('tileSize').value = widthToSlider(Math.max(4, +$('tw').value || BASE_TW));
+  render();
+}
+
+function geometry() {
+  const tw = Math.max(4, Math.round(+$('tw').value || BASE_TW));
+  const th = Math.max(4, Math.round(+$('th').value || BASE_TH));
+  const sx = Math.max(1, Math.round(+$('sx').value || 1));
+  const sy = Math.max(1, Math.round(+$('sy').value || 1));
+  const iw = srcImage.naturalWidth || srcImage.width;
+  const ih = srcImage.naturalHeight || srcImage.height;
+  const cols = Math.max(1, Math.floor(iw / tw));
+  const rows = Math.max(1, Math.floor(ih / th));
+  return { tw, th, sx, sy, cols, rows, pickCols: Math.ceil(cols / sx), pickRows: Math.ceil(rows / sy) };
+}
+
+/* ---------- 色块马赛克：每块取主色 ---------- */
+function dominantColors(cols, rows, tw, th, sub = 8) {
+  const sw = cols * sub, sh = rows * sub;
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(srcImage, 0, 0, cols * tw, rows * th, 0, 0, sw, sh);
+  const d = ctx.getImageData(0, 0, sw, sh).data;
+  const out = new Array(cols * rows);
+  for (let r = 0; r < rows; r++) {
+    for (let cc = 0; cc < cols; cc++) {
+      const buckets = new Map();
+      for (let y = 0; y < sub; y++) {
+        for (let x = 0; x < sub; x++) {
+          const i = ((r * sub + y) * sw + (cc * sub + x)) * 4;
+          const a = d[i + 3] / 255;
+          const R = Math.round(d[i] * a + 255 * (1 - a));   // 透明按白底合成
+          const G = Math.round(d[i + 1] * a + 255 * (1 - a));
+          const B = Math.round(d[i + 2] * a + 255 * (1 - a));
+          const key = ((R >> 5) << 6) | ((G >> 5) << 3) | (B >> 5);   // 每通道 3bit
+          let e = buckets.get(key);
+          if (!e) { e = [0, 0, 0, 0]; buckets.set(key, e); }
+          e[0]++; e[1] += R; e[2] += G; e[3] += B;
+        }
+      }
+      let best = null;
+      for (const e of buckets.values()) if (!best || e[0] > best[0]) best = e;
+      out[r * cols + cc] = [
+        Math.round(best[1] / best[0]),
+        Math.round(best[2] / best[0]),
+        Math.round(best[3] / best[0]),
+      ];
+    }
+  }
+  return out;
+}
+
+/* ---------- 主流程 ---------- */
+function render() {
+  if (!srcImage) return;
+  const { tw, th, sx, sy, cols, rows, pickCols, pickRows } = geometry();
+  $('tileVal').textContent = `${tw}×${th}`;
+  const nBlocks = cols * rows;
+  $('tileHint').textContent = `网格 ${cols}×${rows} = ${nBlocks} 块` +
+    (nBlocks < 12 ? '（块偏大：细节很少，建议把块调小）' : '');
+  $('gapVal').textContent = $('gap').value;
+
+  // 1) 规整抽样
+  const picked = [];
+  for (let r = 0; r < rows; r += sy)
+    for (let c = 0; c < cols; c += sx)
+      picked.push(r * cols + c);
+
+  const gap = Math.round(+$('gap').value);
+  // 折行重组开着时，每行块数 = 人数 × 抽取列数（块大小变了会自动跟着重算）
+  let pc;
+  if (peopleOn) {
+    pc = Math.max(1, Math.round(peopleK * pickCols));
+    $('pc').value = pc;
+  } else {
+    pc = pickCols;              // 开关关闭时固定为完整缩略图
+    $('pc').value = 0;
+  }
+  const pr = Math.max(1, Math.ceil(picked.length / pc));
+
+  let pieces = picked.slice();
+  if ($('scramble').checked) pieces = shuffle(pieces);
+
+  // 2) 拼接：直接从原图 1:1 取块贴进面板
+  const panelW = pc * tw + (pc + 1) * gap;
+  const panelH = pr * th + (pr + 1) * gap;
+  const mosaic = $('mosaicOn').checked;
+  const colorGrid = mosaic ? dominantColors(cols, rows, tw, th) : null;
+  const panel = document.createElement('canvas');
+  panel.width = panelW; panel.height = panelH;
+  const pctx = panel.getContext('2d');
+  pctx.fillStyle = '#fff';
+  pctx.fillRect(0, 0, panelW, panelH);
+  pieces.forEach((idx, j) => {
+    const c = idx % cols, r = (idx / cols) | 0;
+    const x = gap + (j % pc) * (tw + gap);
+    const y = gap + ((j / pc) | 0) * (th + gap);
+    if (mosaic) {
+      const col = colorGrid[r * cols + c];
+      pctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      pctx.fillRect(x, y, tw, th);
+    } else {
+      pctx.drawImage(srcImage, c * tw, r * th, tw, th, x, y, tw, th);
+    }
+  });
+
+  // 3) 结果画布：1:1 贴入（显示大小由「结果缩放」滑杆控制）
+  const cvO = $('cvOut');
+  cvO.width = Math.max(1, panelW);
+  cvO.height = Math.max(1, panelH);
+  const ctxO = cvO.getContext('2d');
+  ctxO.drawImage(panel, 0, 0);
+
+  // 4) 原图画布 + 抽样标记
+  const cvS = $('cvOrig');
+  cvS.width = cols * tw; cvS.height = rows * th;
+  drawOrig(null);
+
+  last = { pieces, cols, tw, th, pc, gap, pr, panel, mosaic, colorGrid };
+  lastPanel = panel;
+  $('badgeSrc').textContent = `${cols * tw}×${rows * th}`;
+  $('badgeOut').textContent = `${cvO.width}×${cvO.height}`;
+  $('badgeGeo').textContent = `网格 ${cols}×${rows} · 抽 ${picked.length} 块`;
+
+  const k = pc / pickCols;
+  if (Math.abs(k - Math.round(k)) < 1e-6 && k > 1) {
+    const kk = Math.round(k);
+    let t = `折成 <b>${kk}</b> 列 → 画面里出现 <b>${kk}</b> 个「人」`;
+    if (pickRows % kk !== 0) t += `（抽取行数 ${pickRows} 不是 ${kk} 的倍数，最后几格会空着）`;
+    $('pcHint').innerHTML = t;
+  } else if (pc === pickCols) {
+    const full = $('peopleOn').checked ? '' : '（开关关闭）';
+    $('pcHint').innerHTML = `每行 <b>${pickCols}</b> 块 = 完整缩略图${full}`;
+  } else {
+    $('pcHint').innerHTML = `每行 <b>${pc}</b> 块（任意值都会折行，可微调）`;
+  }
+  syncPeopleUI();
+
+  applyDisplayScale();
+}
+
+function drawOrig(highlightIdx) {
+  const { tw, th, cols, sx, sy, rows } = geometry();
+  const cvS = $('cvOrig');
+  const ctx = cvS.getContext('2d');
+  ctx.clearRect(0, 0, cvS.width, cvS.height);
+  ctx.drawImage(srcImage, 0, 0, cols * tw, rows * th, 0, 0, cols * tw, rows * th);
+
+  // 抽样标记：小白块（左上角）或整格留白（与裁切一致）
+  const full = $('fullHole').checked;
+  ctx.fillStyle = '#fff';
+  const mw = Math.max(2, tw * MARKER_RATIO), mh = Math.max(2, th * MARKER_RATIO);
+  for (let r = 0; r < rows; r += sy)
+    for (let c = 0; c < cols; c += sx) {
+      if (full) ctx.fillRect(c * tw, r * th, tw, th);
+      else ctx.fillRect(c * tw, r * th, mw, mh);
+    }
+
+  // 高亮当前悬停块的来源格
+  if (highlightIdx != null) {
+    const r = (highlightIdx / cols) | 0, c = highlightIdx % cols;
+    ctx.save();
+    ctx.strokeStyle = '#ff3b30';
+    ctx.lineWidth = Math.max(2, tw * 0.06);
+    ctx.strokeRect(c * tw + 1, r * th + 1, tw - 2, th - 2);
+    ctx.restore();
+  }
+}
+
+/* ---------- 预览缩放：原图 / 结果 各自独立 ---------- */
+let fitMode = true;   // true = 自动适应窗口；拖动任一滑杆后变为手动
+function setCanvasCss(cv, s) {
+  cv.style.width = (cv.width * s) + 'px';
+  cv.style.height = (cv.height * s) + 'px';
+}
+function fitScaleOf(cv) {
+  const stage = cv.parentElement.clientWidth - 32;
+  return Math.max(0.05, Math.min(1, stage / cv.width));
+}
+function applyDisplayScale() {
+  const cvS = $('cvOrig'), cvO = $('cvOut');
+  if (fitMode) {
+    $('zoomS').value = Math.round(fitScaleOf(cvS) * 100);
+    $('zoomO').value = Math.round(fitScaleOf(cvO) * 100);
+  }
+  const sS = (+$('zoomS').value) / 100;
+  const sO = (+$('zoomO').value) / 100;
+  $('zoomSVal').textContent = $('zoomS').value + '%';
+  $('zoomOVal').textContent = $('zoomO').value + '%';
+  setCanvasCss(cvS, sS);
+  setCanvasCss(cvO, sO);
+}
+
+/* ---------- 抽查校验（按需，只抽 24 块，避免卡顿） ---------- */
+function verifySample() {
+  const el = $('verify');
+  if (!lastPanel || !last) { el.className = 'status'; el.textContent = '先生成结果再校验'; return; }
+  const { pieces, cols, tw, th, pc, gap, mosaic, colorGrid } = last;
+  const n = pieces.length;
+  const step = Math.max(1, Math.floor(n / 24));
+  const samples = [];
+  for (let j = 0; j < n && samples.length < 24; j += step) samples.push(j);
+
+  try {
+    const pdata = lastPanel.getContext('2d');
+
+    if (mosaic) {   // 色块模式：比对单元格中心像素与主色
+      let bad = 0;
+      for (const j of samples) {
+        const idx = pieces[j];
+        const c = idx % cols, r = (idx / cols) | 0;
+        const x = gap + (j % pc) * (tw + gap) + (tw >> 1);
+        const y = gap + ((j / pc) | 0) * (th + gap) + (th >> 1);
+        const px = pdata.getImageData(x, y, 1, 1).data;
+        const want = colorGrid[r * cols + c];
+        if (Math.abs(px[0] - want[0]) > 1 || Math.abs(px[1] - want[1]) > 1 || Math.abs(px[2] - want[2]) > 1) bad++;
+      }
+      el.className = 'status ' + (bad ? 'bad' : 'ok');
+      el.textContent = bad
+        ? `✗ 抽查 ${samples.length} 块色块中有 ${bad} 块颜色不对`
+        : `✓ 抽查 ${samples.length}/${samples.length} 块主色填充正确`;
+      return;
+    }
+
+    const ch = th;
+    const probe = document.createElement('canvas');
+    probe.width = tw; probe.height = ch;
+    const pctx = probe.getContext('2d');
+    let bad = 0, worst = 0;
+    for (const j of samples) {
+      const idx = pieces[j];
+      const c = idx % cols, r = (idx / cols) | 0;
+      // 关键：探针也要铺白底，否则透明像素会和面板（白底合成后）比出 255 的假差异
+      pctx.fillStyle = '#fff';
+      pctx.fillRect(0, 0, tw, ch);
+      pctx.drawImage(srcImage, c * tw, r * th, tw, th, 0, 0, tw, ch);
+      const a = pctx.getImageData(0, 0, tw, ch).data;
+      const x = gap + (j % pc) * (tw + gap);
+      const y = gap + ((j / pc) | 0) * (ch + gap);
+      const b = pdata.getImageData(x, y, tw, ch).data;
+      let m = 0;
+      for (let i = 0; i < a.length; i += 4) {
+        const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+        if (d > m) m = d;
+      }
+      if (m > 1) { bad++; if (m > worst) worst = m; }
+    }
+    if (!bad) {
+      el.className = 'status ok';
+      el.textContent = `✓ 抽查 ${samples.length}/${samples.length} 块通过：结果里的块与原图裁切逐像素一致`;
+    } else {
+      el.className = 'status bad';
+      el.textContent = `✗ 抽查 ${samples.length} 块中有 ${bad} 块不一致（最大差 ${worst}）`;
+    }
+  } catch (e) {
+    el.className = 'status';
+    el.textContent = '跨域图片无法读取像素，跳过校验（用本地文件打开即可）';
+  }
+}
+
+/* ---------- 悬停反查 ---------- */
+function cellFromEvent(e) {
+  if (!last) return null;
+  const cvO = $('cvOut');
+  const rect = cvO.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (cvO.width / rect.width);
+  const y = (e.clientY - rect.top) * (cvO.height / rect.height);
+  const { pc, gap, tw, th, pieces } = last;
+  const px = x, py = y;
+  const c = Math.floor(px / (tw + gap));
+  const r = Math.floor(py / (th + gap));
+  const inX = px - c * (tw + gap) - gap;
+  const inY = py - r * (th + gap) - gap;
+  if (inX < 0 || inX >= tw || inY < 0 || inY >= th) return null;
+  if (c < 0 || c >= pc || r < 0) return null;
+  const j = r * pc + c;
+  if (j >= pieces.length) return null;
+  return { j, idx: pieces[j] };
+}
+
+let hoverIdx = null;
+$('cvOut').addEventListener('mousemove', e => {
+  const hit = cellFromEvent(e);
+  if (!hit) {
+    if (hoverIdx !== null) {
+      hoverIdx = null;
+      $('hoverInfo').textContent = '把鼠标移到「结果」里的任意一块上，会在左边「原图」里框出它的来源。';
+      drawOrig(null);
+    }
+    return;
+  }
+  if (hit.idx === hoverIdx) return;          // 还在同一块上：不重复重绘
+  hoverIdx = hit.idx;
+  const { tw, th, cols } = last;
+  const r = (hit.idx / cols) | 0, c = hit.idx % cols;
+  $('hoverInfo').textContent =
+    `结果第 ${((hit.j / last.pc) | 0) + 1} 行第 ${(hit.j % last.pc) + 1} 块 ← 原图第 ${r + 1} 行第 ${c + 1} 列（原图坐标 ${c * tw},${r * th}）`;
+  drawOrig(hit.idx);
+});
+$('cvOut').addEventListener('mouseleave', () => {
+  hoverIdx = null;
+  $('hoverInfo').textContent = '把鼠标移到「结果」里的任意一块上，会在左边「原图」里框出它的来源。';
+  drawOrig(null);
+});
+
+/* ---------- 事件 ---------- */
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+$('run').onclick = render;
+$('check').onclick = verifySample;
+$('tileSize').addEventListener('input', applyTileSlider);
+['tw', 'th'].forEach(id => $(id).addEventListener('input', () => syncTileSlider(id)));
+$('square').addEventListener('change', () => {
+  if ($('square').checked) $('th').value = $('tw').value;   // 开启即锁成正方形
+  render();
+});
+
+// 步长：1:1 锁定时横纵同步
+function onStrideInput(id) {
+  const el = $(id);
+  let v = Math.max(1, Math.round(+el.value || 1));
+  el.value = v;
+  if ($('stride1to1').checked) {
+    $('sx').value = v;
+    $('sy').value = v;
+  }
+  render();
+}
+['sx', 'sy'].forEach(id => $(id).addEventListener('input', () => onStrideInput(id)));
+$('stride1to1').addEventListener('change', () => {
+  if ($('stride1to1').checked) $('sy').value = $('sx').value;   // 开启即对齐
+  render();
+});
+
+['gap', 'scramble'].forEach(id => {
+  $(id).addEventListener('input', render);
+  $(id).addEventListener('change', render);
+});
+
+// 预览缩放：两个滑杆各自控制原图 / 结果
+['zoomS', 'zoomO'].forEach(id => {
+  $(id).addEventListener('input', () => { fitMode = false; applyDisplayScale(); });
+});
+$('fitBtn').onclick = () => { fitMode = true; applyDisplayScale(); };
+// 预览留白模式：只重画原图，不动结果
+$('fullHole').addEventListener('change', () => {
+  const on = $('fullHole').checked;
+  $('holeMode').textContent = on
+    ? '整格全白：被抽走的格子整块变白，与「裁切出去」的块一一对应'
+    : '左上角小白块（40%）：只做标记，方便看原图细节';
+  if (srcImage) drawOrig(null);
+});
+
+// 色块马赛克：每块取主色填充
+$('mosaicOn').addEventListener('change', () => {
+  $('mosaicHint').textContent = $('mosaicOn').checked
+    ? '已开启：每块用主色填充，拼成色块新画'
+    : '开：每块取主色填充，拼成色块新画';
+  if (srcImage) render();
+});
+
+/* ---------- 折行重组：开关 + 人数预设 ---------- */
+function syncPeopleUI() {
+  $('peopleOn').checked = peopleOn;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', peopleOn && +b.dataset.k === peopleK));
+  $('pc').disabled = !peopleOn;        // 开关关闭时禁止调整每行块数
+  $('peopleHint').textContent = peopleOn
+    ? `已开启：按 ${peopleK} 人折行（改块大小会自动重算）`
+    : '关 = 完整缩略图；开 = 按下面人数折行';
+}
+
+$('peopleOn').addEventListener('change', () => {
+  peopleOn = $('peopleOn').checked;
+  if (!peopleOn) $('pc').value = 0;        // 关掉开关 = 回到完整缩略图
+  syncPeopleUI();
+  if (srcImage) render();
+});
+
+document.querySelectorAll('#presets button').forEach(btn => {
+  btn.onclick = () => {
+    if (!srcImage) return;
+    const k = +btn.dataset.k;
+    // 再点一次已选中的按钮 = 取消（回到完整缩略图）
+    if (peopleOn && peopleK === k) { peopleOn = false; $('pc').value = 0; }
+    else { peopleOn = true; peopleK = k; }
+    syncPeopleUI();
+    render();
+  };
+});
+
+// 开关打开时手填「每行块数」= 自定义人数（换算成 K，块大小变了仍按比例重算）
+$('pc').addEventListener('input', () => {
+  if (!peopleOn) return;
+  const { pickCols } = geometry();
+  const v = Math.max(1, +$('pc').value || 0);
+  peopleK = Math.round((v / pickCols) * 1000) / 1000;
+  syncPeopleUI();
+  if (srcImage) render();
+});
+
+function saveCanvas(id, name) {
+  const a = document.createElement('a');
+  a.download = name;
+  a.href = $(id).toDataURL('image/png');
+  a.click();
+}
+$('saveSrc').onclick = () => srcImage && saveCanvas('cvOrig', 'original_marked.png');
+$('saveOut').onclick = () => srcImage && saveCanvas('cvOut', 'result.png');
+
+window.addEventListener('resize', () => applyDisplayScale());
+syncPeopleUI();
+
+/* ---------- 演示图 ---------- */
+const demo = new Image();
+demo.onload = () => { srcImage = ensureWorkable(demo); drop.textContent = 'demo.png（演示图）'; render(); };
+demo.src = 'demo.png';
+</script>
+
+<!-- 右下角署名 -->
+<div class="signature">Produced by Kagayaite</div>
+
+<!-- 使用指南 -->
+<div class="mask" id="guideMask" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <div class="modal-hd"><b id="guideTitle">📖 使用指南</b><button class="modal-x" id="guideClose" aria-label="关闭">✕</button></div>
+    <div class="modal-bd">
+      <h3>① 载入图片</h3>
+      <ul>
+        <li>点击左上「点击选择 / 拖入图片」，或直接把图片拖进虚线框。</li>
+        <li>打开页面会自动载入 <code>demo.png</code> 演示图。</li>
+        <li>超大图（最长边 &gt; 4096px）会自动生成工作副本并提示。</li>
+      </ul>
+
+      <h3>② 切块</h3>
+      <ul>
+        <li><b>块大小</b>：滑杆前 1/3 行程是 1px 一档的精细区间（4–40px），后段快速增大到 200px。</li>
+        <li><b>块宽 / 高</b>：可直接填数字；右侧 <b>1:1</b> 开关锁定正方形块。</li>
+        <li><b>步长 X / Y</b>：每隔几块取一块，2×2 表示用 1/4 的块；<b>1:1</b> 开关让横纵步长一致。</li>
+        <li>滑块下方会显示「网格 5×10 = 50 块」，块太大时会提示细节不足。</li>
+      </ul>
+
+      <h3>③ 预览</h3>
+      <ul>
+        <li><b>原图缩放 / 结果缩放</b>：两个滑杆各自控制左右画面的显示大小（10%–400%）。</li>
+        <li><b>适应窗口</b>：一键让两边各自适配卡片宽度。</li>
+        <li><b>整格留白</b>：关＝左上角小白块标记；开＝整格全白，与「被抽走的块」完全一致。</li>
+        <li>把鼠标移到右边结果的任意一块上，左边原图会<b>红框标出它的来源格</b>，底部显示行列坐标。</li>
+      </ul>
+
+      <h3>④ 折行重组</h3>
+      <ul>
+        <li><b>折行重组</b>开关：关＝完整缩略图；开＝按选定人数折行。</li>
+        <li><b>2 / 3 / 4 / 8 人</b>：每行块数 = 人数 × 抽取列数，块大小改变后仍会保持该人数，无需再点。</li>
+        <li>再点一次已选中的人数按钮可取消；「每行块数」在开关关闭时不可编辑。</li>
+        <li><b>块间缝隙</b>：块与块之间的白边宽度。</li>
+        <li><b>色块马赛克</b>：每块取主色填充，拼成一张色块构成的新画。</li>
+        <li><b>乱序重组</b>：打乱顺序，用于对照。</li>
+      </ul>
+
+      <h3>⑤ 导出与校验</h3>
+      <ul>
+        <li>两个卡片标题栏右侧各有<b>下载</b>按钮，分别导出「原图（带标记）」和「结果」PNG。</li>
+        <li><b>抽查校验</b>：随机抽 24 块，逐像素比对结果与原图裁切是否一致（不自动运行，避免卡顿）。</li>
+      </ul>
+
+      <h3>小贴士</h3>
+      <div class="tip">
+        <ul>
+          <li>想要三个「人」都完整：把抽取行数调成 3 的倍数（例如块高改为能整除的数值）。</li>
+          <li>块越小越接近原图配色，块越大越抽象；做色块马赛克时建议 30–50px。</li>
+          <li>悬停反查 + 200% 缩放，是核对每个块来源最快的组合。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const mask = document.getElementById('guideMask');
+  const open = () => { mask.hidden = false; };
+  const close = () => { mask.hidden = true; };
+  document.getElementById('guideBtn').addEventListener('click', open);
+  document.getElementById('guideClose').addEventListener('click', close);
+  mask.addEventListener('click', (e) => { if (e.target === mask) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+})();
+</script>
+</body>
+</html>
